@@ -1,0 +1,292 @@
+---
+title: Presidenta?
+author: "Fernando Náufel"
+date: now
+date-format: "DD/MM/YYYY HH:mm"
+lang: pt
+
+#bibliography: bibliography.bib
+csl: universidade-do-porto-faculdade-de-engenharia-chicago-pt-crono.csl
+
+format:
+  html:
+    toc: true  
+    toc-depth: 3
+    number-depth: 3
+    theme: 
+      - journal
+      - _custom.scss
+    link-external-icon: true
+    link-external-newwindow: true
+    link-external-filter: ^(?:http:|https:)\/\/fnaufel\.github\.io
+    df-print: paged
+    code-link: true
+    code-copy: true
+    code-tools: true
+    self-contained: true
+---
+
+# Setup
+
+```{r setup}
+source('_setup.R')
+```
+
+
+# Dados
+
+Arquivo `br-utf8.txt`, obtido de <https://www.ime.usp.br/~pf/dicios/> em 22/12/2023.
+
+
+# Leitura
+
+```{r}
+df_all <- read_csv(
+  '../word-lists/br-utf8.txt',
+  col_names = 'palavra'
+)
+```
+
+```{r}
+df_all %>% glimpse()
+```
+
+Algumas palavras duplicadas, aparentemente todas contendo "ü" antigamente:
+
+```{r}
+df_all %>% 
+  count(palavra, sort = TRUE) %>% 
+  filter(n > 1)
+```
+
+Eliminar duplicatas:
+
+```{r}
+df_all <- df_all %>% distinct()
+```
+
+
+# Terminando em "ente"
+
+* Advérbios terminados em "mente": "insensivelmente".
+
+* Formas de verbos terminados em "entar": "segmente", "saliente".
+
+* Adjetivos de verbos em "er": "absorvente".
+
+* Outros adjetivos: "saliente".
+
+* Substantivos masculinos sem correspondente feminino: "detergente".
+
+* Substantivos masculinos com feminino "enta": "parente".
+
+::: {.callout-note}
+
+## Por eliminação
+
+O objetivo é justamente achar todos os substantivos masculinos terminados em "ente" com feminino "enta".
+
+Se eliminarmos os outros casos acima, teremos as palavras que queremos.
+
+:::
+
+```{r cache=TRUE}
+df_ente <- df_all %>% 
+  filter(str_detect(palavra, 'ente$'))
+```
+
+```{r}
+df_ente %>% slice_sample(n = 10)
+```
+
+```{r}
+df_ente
+```
+
+
+# Terminados em "enta"
+
+* Cerca de $150$.
+
+* Femininos de adjetivos terminados em "ento": "briguenta".
+
+* Formas de verbos terminados em "entar": "enfrenta".
+
+* Substantivos femininos de "...ente": "parenta".
+
+* Substantivos femininos sem correspondente masculino: "ferramenta".
+
+* Numerais: "quarenta".
+
+```{r cache=TRUE}
+df_enta <- df_all %>% 
+  filter(str_detect(palavra, 'enta$'))
+```
+
+```{r}
+df_enta %>% slice_sample(n = 10)
+```
+
+```{r}
+df_enta
+```
+
+
+# Função para comparar palavras com mesmo radical
+
+```{r}
+pares <- function(
+  df,
+  padrao1, 
+  padrao2,
+  apenas_pares = TRUE
+) {
+  
+  df1 <- df %>% 
+    filter(str_detect(palavra, padrao1)) %>% 
+    separate_wider_regex(
+      palavra,
+      patterns = c(
+        'radical' = '.*',
+        'final1'  = padrao1
+      )
+    )
+  
+  df2 <- df %>% 
+    filter(str_detect(palavra, padrao2)) %>% 
+    separate_wider_regex(
+      palavra,
+      patterns = c(
+        'radical' = '.*',
+        'final2'  = padrao2
+      )
+    )
+
+  if (apenas_pares) {
+    rv <- inner_join(
+      df1, df2,
+      by = 'radical'
+    ) 
+  } else {
+    rv <- full_join(
+      df1, df2,
+      by = 'radical'
+    ) 
+  }
+  
+  rv %>% 
+    arrange(radical)
+  
+}
+```
+
+```{r}
+df_ente_enta <- df_all %>% pares('ente$', 'enta$')
+df_ente_enta
+```
+
+
+# "...ento" $\times$ "...enta"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('ento$', 'enta$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('ento$', 'enta$', apenas_pares = FALSE)
+```
+
+
+
+# "...ente" $\times$ "...enta"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('ente$', 'enta$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('ente$', 'enta$', apenas_pares = FALSE)
+```
+
+
+# "...entar" $\times$ "...ente"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('entar$', 'ente$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('entar$', 'ente$', apenas_pares = FALSE)
+```
+
+
+# "...er" $\times$ "...ente"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('er$', 'ente$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('er$', 'ente$', apenas_pares = FALSE)
+```
+
+
+# "...mente" $\times$ "..."
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('mente$', '.')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('mente$', '.', apenas_pares = FALSE)
+```
+
+
+# "..." ausente $\times$ "...ento"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('.', 'ento$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('.', 'ento$', apenas_pares = FALSE)
+```
+
+
+# "..." ausente $\times$ "...enta"
+
+## Apenas pares
+
+```{r}
+df_all %>% pares('.', 'enta$')
+```
+
+## Todos
+
+```{r}
+df_all %>% pares('.', 'enta$', apenas_pares = FALSE)
+```
